@@ -15,7 +15,9 @@
 
 #include "pms.h"
 
+#include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -164,7 +166,16 @@ static int ParseNewPermissionsItem(const cJSON *object, PermissionSaved *perms)
 {
     cJSON *itemFlags = cJSON_GetObjectItem(object, FIELD_FLAGS);
     if (itemFlags != NULL) {
-        perms->flags = atoi(itemFlags->valuestring);
+        if (!cJSON_IsString(itemFlags) || itemFlags->valuestring == NULL) {
+            return PERM_ERRORCODE_JSONPARSE_FAIL;
+        }
+        errno = 0;
+        char *end = NULL;
+        long flags = strtol(itemFlags->valuestring, &end, 10);
+        if (errno == ERANGE || end == itemFlags->valuestring || *end != '\0' || flags < INT_MIN || flags > INT_MAX) {
+            return PERM_ERRORCODE_JSONPARSE_FAIL;
+        }
+        perms->flags = (int)flags;
     } else {
         perms->flags = PMS_FLAG_DEFAULT;
     }
